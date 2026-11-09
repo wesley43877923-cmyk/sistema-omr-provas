@@ -10,8 +10,8 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("Gerador e Leitor de Cartões-Resposta")
-st.markdown("Aplicação para geração de folhas de resposta personalizadas e correção automatizada por visão computacional.")
+st.title("📝 OMR Master - Gerador e Leitor de Cartões-Resposta")
+st.markdown("Aplicação modular para geração de folhas de resposta personalizadas e correção automatizada por visão computacional.")
 
 tabs = st.tabs(["🖨️ 1. Gerar Cartões-Resposta", "📷 2. Corrigir Avaliações", "ℹ️ Instruções de Uso"])
 
