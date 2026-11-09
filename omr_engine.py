@@ -35,7 +35,7 @@ class OMRGenerator:
             c.rect(margin, margin, marker_size, marker_size, fill=1, stroke=0)
             c.rect(width - margin - marker_size, margin, marker_size, marker_size, fill=1, stroke=0)
             
-            # --- QR CODE NATIVO REPORTLAB ---
+            # --- QR CODE NATIVO ---
             qr_data = f"ID:{matricula}|NOME:{nome}|TURMA:{turma}|Q:{num_questoes}|ALT:{num_alternativas}"
             qr_widget = QrCodeWidget(qr_data)
             qr_widget.barWidth = 70
@@ -108,7 +108,7 @@ class OMRGenerator:
 
 
 class OMRProcessor:
-    """Processador OMR com cálculo geométrico proporcional exato."""
+    """Processador OMR com alinhamento de perspectiva automático pelos 4 marcadores de canto."""
     
     @staticmethod
     def process_card(image_bytes, gabarito):
@@ -118,21 +118,16 @@ class OMRProcessor:
         if img is None:
             return {"status": "Erro: Imagem inválida"}
             
-        qr_detector = cv2.QRCodeDetector()
-        data, bbox, _ = qr_detector.detectAndDecode(img)
-        
-        meta = {}
-        if data:
-            parts = data.split('|')
-            for p in parts:
-                if ':' in p:
-                    k, v = p.split(':', 1)
-                    meta[k] = v
+        # 1. Tenta decodificar QR Code
+        meta = OMRProcessor.read_qrcode(img)
         
         num_questoes = int(meta.get('Q', len(gabarito) if gabarito else 30))
         num_alternativas = int(meta.get('ALT', 4))
         
+        # 2. Correção de perspectiva alinhada aos marcadores
         warped = OMRProcessor.rectify_image(img)
+        
+        # 3. Leitura das bolinhas
         respostas_aluno = OMRProcessor.read_bubbles(warped, num_questoes, num_alternativas)
         
         acertos = 0
@@ -162,10 +157,74 @@ class OMRProcessor:
         }
 
     @staticmethod
+    def read_qrcode(img):
+        qr_detector = cv2.QRCodeDetector()
+        data, bbox, _ = qr_detector.detectAndDecode(img)
+        
+        # Se falhar, tenta aplicar contraste/nitidez na imagem para tentar ler o QR Code
+        if not data:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            enhanced = cv2.equalizeHist(gray)
+            data, _, _ = qr_detector.detectAndDecode(enhanced)
+            
+        meta = {}
+        if data:
+            parts = data.split('|')
+            for p in parts:
+                if ':' in p:
+                    k, v = p.split(':', 1)
+                    meta[k] = v
+        return meta
+
+    @staticmethod
     def rectify_image(img):
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        resized = cv2.resize(gray, (1000, 1414))
-        return resized
+        """Localiza os 4 marcadores quadrados nos cantos e aplica transformação de perspectiva."""
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if len(img.shape) == 3 else img
+        
+        # Binarização para encontrar marcadores pretos
+        _, thresh = cv2.threshold(gray, 100, 255, cv2.THRESH_BINARY_INV)
+        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        img_h, img_w = gray.shape
+        centers = []
+        
+        for c in contours:
+            area = cv2.contourArea(c)
+            # Marcadores de canto têm tamanho razoável proporcional à página
+            if (img_w * img_h * 0.0001) < area < (img_w * img_h * 0.03):
+                x, y, w, h = cv2.boundingRect(c)
+                aspect_ratio = float(w) / h
+                if 0.7 <= aspect_ratio <= 1.3:
+                    M = cv2.moments(c)
+                    if M["m00"] != 0:
+                        centers.append((int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])))
+                        
+        # Se encontrar os 4 cantos, aplica transformação de perspectiva
+        if len(centers) >= 4:
+            centers = sorted(centers, key=lambda p: p[1]) # ordena por Y
+            top_pts = sorted(centers[:2], key=lambda p: p[0]) # 2 superiores (TL, TR)
+            bot_pts = sorted(centers[-2:], key=lambda p: p[0]) # 2 inferiores (BL, BR)
+            
+            pts1 = np.float32([top_pts[0], top_pts[1], bot_pts[0], bot_pts[1]])
+            
+            # Posições de referência padrão do PDF A4 em pixels (1000 x 1414)
+            margin_x = int(30 * (1000.0 / 595.27)) + 15
+            margin_y_top = int(30 * (1414.0 / 841.89)) + 15
+            margin_y_bot = 1414 - margin_y_top
+            
+            pts2 = np.float32([
+                [margin_x, margin_y_top],
+                [1000 - margin_x, margin_y_top],
+                [margin_x, margin_y_bot],
+                [1000 - margin_x, margin_y_bot]
+            ])
+            
+            matrix = cv2.getPerspectiveTransform(pts1, pts2)
+            warped = cv2.warpPerspective(gray, matrix, (1000, 1414))
+            return warped
+            
+        # Fallback se não encontrar marcadores: apenas redimensiona
+        return cv2.resize(gray, (1000, 1414))
 
     @staticmethod
     def read_bubbles(gray_img, num_questoes, num_alternativas):
@@ -184,8 +243,10 @@ class OMRProcessor:
         q_per_col = (num_questoes + num_cols - 1) // num_cols
         col_width_pdf = (595.27 - 60) / num_cols
         
-        thresh = cv2.adaptiveThreshold(gray_img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                        cv2.THRESH_BINARY_INV, 15, 5)
+        # Limiarização adaptativa otimizada para caneta preta e azul
+        blur = cv2.GaussianBlur(gray_img, (5, 5), 0)
+        thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                        cv2.THRESH_BINARY_INV, 21, 7)
         respostas = {}
         
         for q_idx in range(1, num_questoes + 1):
@@ -207,7 +268,8 @@ class OMRProcessor:
             max_val = counts[max_idx]
             other_avg = (sum(counts) - max_val) / max(1, (len(counts) - 1))
             
-            if max_val > 300 and (max_val - other_avg) > 70:
+            # Limiar ajustado para aceitar preenchimento com caneta azul ou preta
+            if max_val > 140 and (max_val - other_avg) > 40:
                 respostas[q_idx] = letras[max_idx]
             else:
                 respostas[q_idx] = "EM_BRANCO"
