@@ -27,8 +27,8 @@ with tabs[0]:
         disciplina = st.text_input("Disciplina / Matéria", "Matemática")
         
         # Entrada direta via teclado
-        num_questoes = st.number_input("Quantidade de Questões", min_value=1, max_value=45, value=30, step=1)
-        num_alternativas = st.number_input("Número de Alternativas", min_value=2, max_value=5, value=4, step=1)
+        num_questoes = st.number_input("Quantidade de Questões", min_value=1, max_value=45, value=10, step=1)
+        num_alternativas = st.number_input("Número de Alternativas", min_value=2, max_value=5, value=5, step=1)
         
         st.markdown("---")
         st.subheader("Lista de Alunos")
