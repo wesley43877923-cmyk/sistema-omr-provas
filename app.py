@@ -23,7 +23,7 @@ with tabs[0]:
     
     with col1:
         st.subheader("Configurações da Prova")
-        escola = st.text_input("Escola", value="")
+        escola = st.text_input("Escola", value="",placeholder="Ex: C.E. Maria Veralba Ferraz")
         disciplina = st.text_input("Disciplina", "Matemática")
 
         
