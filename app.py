@@ -93,8 +93,8 @@ with tabs[1]:
         gabarito = {}
         
         if modo_gabarito == "✍️ Preenchimento Manual":
-            n_q_gabarito = st.number_input("Nº de Questões da Prova", min_value=1, max_value=45, value=30, step=1)
-            n_alt_gabarito = st.number_input("Nº de Alternativas (ex: 4 = A-D)", min_value=2, max_value=5, value=4, step=1)
+            n_q_gabarito = st.number_input("Nº de Questões da Prova", min_value=1, max_value=45, value=10, step=1)
+            n_alt_gabarito = st.number_input("Nº de Alternativas (ex: 4 = A-D)", min_value=2, max_value=5, value=5, step=1)
             
             letras_disp = ['A', 'B', 'C', 'D', 'E'][:n_alt_gabarito]
             st.markdown("**Selecione a resposta correta de cada questão:**")
