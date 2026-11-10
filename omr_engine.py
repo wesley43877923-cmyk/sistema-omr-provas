@@ -8,6 +8,51 @@ from reportlab.lib import colors
 from reportlab.graphics.shapes import Drawing
 from reportlab.graphics.barcode.qr import QrCodeWidget
 
+
+def desentortar_e_alinhar(imagem_bgr):
+    gray = cv2.cvtColor(imagem_bgr, cv2.COLOR_BGR2GRAY)
+    
+    # 1. Binarização para destacar os marcadores pretos dos cantos
+    _, thresh = cv2.threshold(gray, 80, 255, cv2.THRESH_BINARY_INV)
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    cantos = []
+    h_img, w_img = gray.shape
+    
+    for c in contours:
+        area = cv2.contourArea(c)
+        # Filtra por contornos com tamanho compatível com os 4 marcadores dos cantos
+        if (w_img * h_img * 0.0001) < area < (w_img * h_img * 0.02):
+            x, y, w, h = cv2.boundingRect(c)
+            aspect_ratio = float(w) / h
+            if 0.8 <= aspect_ratio <= 1.2: # Garantir formato próximo a quadrado
+                M = cv2.moments(c)
+                if M["m00"] != 0:
+                    cantos.append((int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])))
+    
+    # 2. Se encontrar os 4 cantos, ajusta a perspectiva
+    if len(cantos) == 4:
+        # Ordena os pontos: 2 superiores e 2 inferiores
+        cantos = sorted(cantos, key=lambda p: p[1])
+        top_pts = sorted(cantos[:2], key=lambda p: p[0]) # [TL, TR]
+        bot_pts = sorted(cantos[2:], key=lambda p: p[0]) # [BL, BR]
+        
+        pts_origem = np.float32([top_pts[0], top_pts[1], bot_pts[0], bot_pts[1]])
+        
+        # Posição ideal na imagem retificada de referência (1000x1414)
+        pts_destino = np.float32([
+            [65, 65],       # Top-Left
+            [935, 65],      # Top-Right
+            [65, 1349],     # Bottom-Left
+            [935, 1349]     # Bottom-Right
+        ])
+        
+        matriz = cv2.getPerspectiveTransform(pts_origem, pts_destino)
+        imagem_alinhada = cv2.warpPerspective(imagem_bgr, matriz, (1000, 1414))
+        return imagem_alinhada
+
+    # Fallback se a imagem não precisar de ajuste ou não encontrar os 4 cantos
+    return cv2.resize(imagem_bgr, (1000, 1414))
 class OMRGenerator:
     """Gera cartões-resposta em PDF com marcadores de ancoragem e QR Code nativo."""
     
