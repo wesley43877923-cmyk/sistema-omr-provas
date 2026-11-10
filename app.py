@@ -22,9 +22,10 @@ with tabs[0]:
     col1, col2 = st.columns([1, 2])
     
     with col1:
-        st.subheader("Configurações da Prova")
-        escola = st.text_input("Nome da Escola", "Colégio Dom Pedro II")
-        disciplina = st.text_input("Disciplina / Matéria", "Matemática")
+         st.subheader("Configurações da Prova")
+        escola = st.text_input("Escola", value="", placeholder="Ex: C.E. Maria Veralba Ferraz")
+        disciplina = st.text_input("Disciplina", value="", placeholder="Ex: Matemática")
+        
         
         # Entrada direta via teclado
         num_questoes = st.number_input("Quantidade de Questões", min_value=1, max_value=45, value=10, step=1)
