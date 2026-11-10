@@ -46,9 +46,10 @@ with tabs[0]:
             else:
                 df_alunos = pd.read_excel(arquivo_alunos)
         elif usar_exemplo:
+          
             df_alunos = pd.DataFrame({
-                'matricula': ['2024001', '2024002', '2024003'],
-                'nome': ['Ana Silva', 'Bruno Costa', 'Carla Oliveira'],
+                'matricula': ['201918830244101', '201818830185883', '201712520285914'],
+                'nome': ['ALISSON', 'Bruno Costa', 'Carla Oliveira'],
                 'turma': ['1001', '1001', '1001'],
                 'escola': [escola] * 3,
                 'disciplina': [disciplina] * 3
