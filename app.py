@@ -80,7 +80,7 @@ with tabs[0]:
 
 # ----------------- ABA 2: LEITOR E CORRETOR -----------------
 with tabs[1]:
-    st.header("Leitor OMR & Corretor de Cartões")
+    st.header("Leitor & Corretor de Cartões")
     
     col_gab, col_proc = st.columns([1, 2])
     
